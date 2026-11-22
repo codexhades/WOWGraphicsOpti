@@ -1,0 +1,9 @@
+## Interface: 120105, 120107
+## Title: SpellDensityLock
+## Notes: Holds Spell Density, spell clutter, and Optional GPU Features at your chosen values when the game resets them.
+## Author: codexhades
+## Version: 1.0.0
+## SavedVariables: SpellDensityLockDB
+## X-Category: Graphics
+
+SpellDensityLock.lua
