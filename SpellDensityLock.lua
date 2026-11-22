@@ -4,7 +4,8 @@
 -- (the options menu keeps showing your choice while the live value changes),
 -- so this addon re-applies your values after every loading screen, again a
 -- few seconds later, and immediately if one of the managed CVars changes
--- to something else mid-session.
+-- to something else mid-session. A quiet safety sweep also re-checks every
+-- 60 seconds, in case a value is ever changed without an announcement.
 --
 -- Managed CVars:
 --   spellVisualDensityFilterSetting  (Ally Spell Visual Density: 1 Essential, 2 Reduced, 4 Everything)
@@ -104,6 +105,17 @@ local function Help()
     Print("  /sdl quiet             toggle correction messages")
 end
 
+local sweepStarted = false
+local function StartSweep()
+    if sweepStarted then return end
+    sweepStarted = true
+    local function tick()
+        if db then ApplyAll("safety sweep") end
+        C_Timer.After(60, tick)
+    end
+    C_Timer.After(60, tick)
+end
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
@@ -118,7 +130,7 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         end
         if type(db.stats) ~= "table" then db.stats = { corrections = 0, lastCorrection = nil } end
     elseif event == "PLAYER_LOGIN" then
-        if db then ApplyAll("login") end
+        if db then ApplyAll("login"); StartSweep() end
     elseif event == "PLAYER_ENTERING_WORLD" then
         if db then
             ApplyAll("loading screen")
