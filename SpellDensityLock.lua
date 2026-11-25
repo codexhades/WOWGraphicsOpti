@@ -41,31 +41,36 @@ local function ReadCVar(name)
     return nil
 end
 
-local function ManagedList()
-    local list = {
-        { name = "spellVisualDensityFilterSetting", want = function() return db.filter end, label = "Spell density filter" },
-        { name = "spellClutter", want = function() return db.clutter end, label = "Spell clutter" },
-        { name = "RAIDspellClutter", want = function() return db.clutter end, label = "Spell clutter (raid profile)" },
-    }
-    if db.gpuManaged then
-        table.insert(list, { name = "GxCompatOptionalGpuFeatures", want = function() return db.gpuValue end, label = "Optional GPU features" })
-    end
-    return list
+-- The managed list is a static table, built once at load and never rebuilt.
+-- Each entry names the db field holding its wanted value (key), so slash
+-- commands can change values without touching the list. The GPU entry is
+-- always present and is skipped unless db.gpuManaged is on.
+local MANAGED = {
+    { name = "spellVisualDensityFilterSetting", key = "filter", label = "Spell density filter" },
+    { name = "spellClutter", key = "clutter", label = "Spell clutter" },
+    { name = "RAIDspellClutter", key = "clutter", label = "Spell clutter (raid profile)" },
+    { name = "GxCompatOptionalGpuFeatures", key = "gpuValue", label = "Optional GPU features", gpuOnly = true },
+}
+
+local function IsActive(item)
+    return not item.gpuOnly or db.gpuManaged
 end
 
 local function ApplyAll(source)
     if applying then return end
     applying = true
-    for _, item in ipairs(ManagedList()) do
-        local current = ReadCVar(item.name)
-        if current ~= nil then
-            local want = tostring(item.want())
-            if current ~= want then
-                SetCVar(item.name, want)
-                db.stats.corrections = db.stats.corrections + 1
-                db.stats.lastCorrection = date("%Y-%m-%d %H:%M:%S")
-                if not db.quiet then
-                    Print(("%s was %s, restored to %s (%s). Correction #%d."):format(item.label, current, want, source, db.stats.corrections))
+    for _, item in ipairs(MANAGED) do
+        if IsActive(item) then
+            local current = ReadCVar(item.name)
+            if current ~= nil then
+                local want = tostring(db[item.key])
+                if current ~= want then
+                    SetCVar(item.name, want)
+                    db.stats.corrections = db.stats.corrections + 1
+                    db.stats.lastCorrection = date("%Y-%m-%d %H:%M:%S")
+                    if not db.quiet then
+                        Print(("%s was %s, restored to %s (%s). Correction #%d."):format(item.label, current, want, source, db.stats.corrections))
+                    end
                 end
             end
         end
@@ -76,14 +81,16 @@ end
 
 local function Status()
     Print("your chosen values vs the game's live values:")
-    for _, item in ipairs(ManagedList()) do
-        local current = ReadCVar(item.name)
-        if current ~= nil then
-            local want = tostring(item.want())
-            local mark = (current == want) and "|cff66ff66match|r" or "|cffff6666DIFFERS|r"
-            Print(("  %s: live %s, yours %s  %s"):format(item.label, current, want, mark))
-        else
-            Print(("  %s: not present on this client"):format(item.label))
+    for _, item in ipairs(MANAGED) do
+        if IsActive(item) then
+            local current = ReadCVar(item.name)
+            if current ~= nil then
+                local want = tostring(db[item.key])
+                local mark = (current == want) and "|cff66ff66match|r" or "|cffff6666DIFFERS|r"
+                Print(("  %s: live %s, yours %s  %s"):format(item.label, current, want, mark))
+            else
+                Print(("  %s: not present on this client"):format(item.label))
+            end
         end
     end
     if not db.gpuManaged then
@@ -140,8 +147,8 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "CVAR_UPDATE" then
         if db and not applying and (GetTime() - lastApply) > 1 then
             local changed = string.lower(arg1 or "")
-            for _, item in ipairs(ManagedList()) do
-                if string.lower(item.name) == changed then
+            for _, item in ipairs(MANAGED) do
+                if IsActive(item) and string.lower(item.name) == changed then
                     ApplyAll("the game changed a value")
                     break
                 end

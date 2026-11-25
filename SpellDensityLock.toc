@@ -2,7 +2,7 @@
 ## Title: SpellDensityLock
 ## Notes: Holds Spell Density, spell clutter, and Optional GPU Features at your chosen values when the game resets them.
 ## Author: codexhades
-## Version: 1.0.1
+## Version: 1.0.2
 ## SavedVariables: SpellDensityLockDB
 ## X-Category: Graphics
 
